@@ -10,8 +10,8 @@ CXX       = g++
 # compiling flags here
 
 # Change line 13/14 and 31/32 to switch between python 3.5 and python 2.7
-#CFLAGS   =  -pthread -std=c++11 $(OPT) -Wall -I.  -I/usr/include/python3.5m/
-CFLAGS   =  -pthread -std=c++11 $(OPT) -Wall -fPIC -I. -I/usr/include/python2.7/
+CFLAGS   =  -pthread -std=c++11 $(OPT) -Wall -I.  -I/usr/include/python3.5m/
+#CFLAGS   =  -pthread -std=c++11 $(OPT) -Wall -fPIC -I. -I/usr/include/python2.7/
 
 
 LINKER   = g++ -o
@@ -28,8 +28,8 @@ rm       = rm -f
 all: $(BINDIR)/$(TARGET_LIB)
 
 $(BINDIR)/$(TARGET_LIB): $(OBJECTS)
-  #g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython3.5m -lboost_python-py35
-	g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython2.7 -lboost_python
+	g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython3.5m -lboost_python-py35
+	#g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython2.7 -lboost_python
 	@echo "Built lib successfully!"
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.cpp

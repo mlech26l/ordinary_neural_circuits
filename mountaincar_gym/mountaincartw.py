@@ -52,7 +52,6 @@ class TWsearchEnv:
 
         total_reward=np.zeros(1)
         gamma = 1.0
-        time =0.0
 
         start_pos=0
         has_started=False
@@ -60,24 +59,23 @@ class TWsearchEnv:
         while 1:
             action = self.lif.Update(observations,0.01,10)
             actions=action
-            if(do_render):
-                print('T/R: '+str(time)+', '+str(total_reward)+': '+str(obs[0])+': '+str(obs[1]))
-                time += 1.0/24.0
+            
             obs, r, done, info = self.env.step(actions)
             self.set_observations_for_lif(obs,observations)
-
+            if(do_render and done):
+                print('Done')
 
             total_reward += r*gamma
             #gamma = gamma*gamma
 
             if(do_render):
-                rewardlog.write(str(total_reward)+'\n')
-                rewardlog.flush()
-                self.lif.DumpState('lif-dump.csv')
-                # pic = env.render()
-                screen = self.env.render(mode='rgb_array')
-                pic = TensorRGBToImage(screen)
-                pic.save('vid/img_'+str(i).zfill(5)+'.png')
+                #rewardlog.write(str(total_reward)+'\n')
+                #rewardlog.flush()
+                #self.lif.DumpState('lif-dump.csv')
+                self.env.render()
+                #screen = self.env.render(mode='rgb_array')
+                #pic = self.TensorRGBToImage(screen)
+                #pic.save('vid/img_'+str(i).zfill(5)+'.png')
             elif(done):
                 break
             i+=1

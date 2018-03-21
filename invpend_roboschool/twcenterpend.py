@@ -1,4 +1,4 @@
-# from OpenGL import GLU
+from OpenGL import GLU
 import gym, roboschool
 from gym import wrappers
 import numpy as np
