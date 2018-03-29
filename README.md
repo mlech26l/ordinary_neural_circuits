@@ -1,5 +1,13 @@
 # Neuronal Circuit Policies
 Official code repository to verify and reproduce the experiments of the paper *Neuronal Circuit Policies*
+```bibtex
+@article{lechner18neuronal,
+  title={Neuronal Circuit Policies},
+  author={Lechner, Mathias and Hasani, Ramin M. and Grosu, Radu},
+  journal={arXiv preprint arXiv:1803.08554},
+  year={2018}
+}
+```
 
 # How to get it working:
 - First you need to install the Reinforcement Learning environments: [Open-AI Gym](https://gym.openai.com/) [Roboschool](https://github.com/openai/roboschool) and [rllab](https://github.com/rll/rllab)
@@ -29,7 +37,7 @@ or
 cd invpend_roboschool/
 python3 twcenterpend.py
 ```
-*Note:* You need to `cd` into the particular directories because the library and the optimized policy parameters are loaded from relative paths of the working directory. 
+*Note:* You need to `cd` into the particular directories because the library and the optimized policy parameters are loaded from relative paths of the working directory.
 
 ## Parking
 To get the deterministic parking environment working you have to compile the rover simulator:
