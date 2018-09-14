@@ -1,10 +1,10 @@
 # Neuronal Circuit Policies
-Official code repository to verify and reproduce the experiments of the paper *Neuronal Circuit Policies*
+Official code repository to verify and reproduce the experiments of the paper *Re-purposing Compact Neuronal Circuit Policies to Govern Reinforcement Learning Tasks*
 ```bibtex
-@article{lechner18neuronal,
-  title={Neuronal Circuit Policies},
-  author={Lechner, Mathias and Hasani, Ramin M. and Grosu, Radu},
-  journal={arXiv preprint arXiv:1803.08554},
+@article{hasani2018repurposing,
+  title={Re-purposing Compact Neuronal Circuit Policies to Govern Reinforcement Learning Tasks},
+  author={Hasani, Ramin M. and Lechner, Mathias  and  Amini, Alexander and Rus,Daniela and Grosu, Radu},
+  journal={arXiv preprint arXiv:1809.04423},
   year={2018}
 }
 ```
