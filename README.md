@@ -9,6 +9,8 @@ Official code repository to verify and reproduce the experiments of the paper *R
 }
 ```
 
+Detailed Description of the experiments can be found in the supplementary materials section of the paper, here: https://arxiv.org/pdf/1809.04423.pdf
+
 # How to get it working:
 - First you need to install the Reinforcement Learning environments: [Open-AI Gym](https://gym.openai.com/) [Roboschool](https://github.com/openai/roboschool) and [rllab](https://github.com/rll/rllab)
 - Next you need to compile the **pybnn** library (simulates neuronal circuits using C++) and copy the shared object to each of the local working directories. You have to install python-boost:
