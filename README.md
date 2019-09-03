@@ -26,7 +26,17 @@ cp bin/pybnn.so ../mountaincar_rllab/
 cp bin/pybnn.so ../invpend_roboschool/
 cp bin/pybnn.so ../mountaincar_gym/
 cp bin/pybnn.so ../parking/
+cp bin/pybnn.so ../invpend/
+cp bin/pybnn.so ../half_cheetah/
 ```
+
+In case you get an error compiling pybnn you need to locate the header ```pyconfig.h```:
+
+```
+find /usr/include -name pyconfig.h
+```
+
+and modify the ```CFLAGS``` in the Makefile accordingly.
 
 ## Verifying
 To check if the toolchain is working as intended you can execute a learned neuronal policy:

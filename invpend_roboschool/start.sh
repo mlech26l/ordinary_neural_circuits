@@ -1,20 +1,16 @@
-python twcenterpend.py 1 &
-python twcenterpend.py 2 &
-python twcenterpend.py 3 &
-python twcenterpend.py 4 &
-python twcenterpend.py 5 &
-python twcenterpend.py 6 &
-python twcenterpend.py 7 &
-python twcenterpend.py 8 &
-python twcenterpend.py 9 &
-python twcenterpend.py 10 &
-python twcenterpend.py 11 &
-python twcenterpend.py 12 &
-#python twcenterpend.py 13 &
-#python twcenterpend.py 14 &
-#python twcenterpend.py 15 &
-#python twcenterpend.py 16 &
-#python twcenterpend.py 17 &
-#python twcenterpend.py 18 &
-#python twcenterpend.py 19 &
-#python twcenterpend.py 20 &
+python3 twcenterpend.py --file tw_pure.bnn --optimize --id tw0 &
+python3 twcenterpend.py --file tw_pure.bnn --optimize --id tw1 &
+python3 twcenterpend.py --file tw_pure.bnn --optimize --id tw2 &
+python3 twcenterpend.py --file tw_pure.bnn --optimize --id tw3 &
+python3 twcenterpend.py --file tw_pure.bnn --optimize --id tw4
+
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_000.bnn --optimize --id rnd00 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_001.bnn --optimize --id rnd01 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_002.bnn --optimize --id rnd02 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_003.bnn --optimize --id rnd03 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_004.bnn --optimize --id rnd04 
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_005.bnn --optimize --id rnd05 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_006.bnn --optimize --id rnd06 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_007.bnn --optimize --id rnd07 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_008.bnn --optimize --id rnd08 &
+python3 twcenterpend.py --file ../generate_circuits/circuits/circuit_009.bnn --optimize --id rnd09 
