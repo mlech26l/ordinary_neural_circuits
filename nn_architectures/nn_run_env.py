@@ -1,107 +1,75 @@
 # from OpenGL import GLU
-import gym, roboschool
 from gym import wrappers
 import numpy as np
-import pybnn
 import random as rng
 from PIL import Image,ImageDraw
 import datetime
 import sys
 import os
 import argparse
+import mlp_module
+import lstm_module
 
-class NN:
-
-    def __init__(self):
-        
+env_table = {
+    "invpend": "RoboschoolInvertedPendulum-v1",
+    "cheetah": "HalfCheetah-v1",
+    "mountaincar": "MountainCarContinuous-v0",
+}
 
 class NNsearchEnv:
-    def __init__(self,env,filter_len, mean_len):
-        self.env = env
-        self.filter_len = filter_len
-        self.mean_len=mean_len
+    def __init__(self,env_name,filter,mean,nn_type):
+        self.env_name = env_name
+        assert env_name in env_table.keys(), "Envname must be one of "+str(env_table.keys())
+        if(env_name == "invpend"):
+            import gym, roboschool
+        
+        self.env = gym.make(env_table[env_name])
+        self.nn_type = nn_type
+        self.create_nn(self.nn_type)
 
-    def TensorRGBToImage(self,tensor):
-        new_im = Image.new("RGB",(tensor.shape[1],tensor.shape[0]))
-        pixels=[]
-        for y in range(tensor.shape[0]):
-            for x in range(tensor.shape[1]):
-                r = tensor[y][x][0]
-                g = tensor[y][x][1]
-                b = tensor[y][x][2]
-                pixels.append((r,g,b))
-        new_im.putdata(pixels)
-        return new_im
+        self.filter_len = filter
+        self.mean_len=mean
 
-    def set_observations_for_lif(self,obs,observations):
-        observations[0] = np.arcsin(float(obs[3]))
-        # observations[0] = float(obs[4])
-        observations[1] = float(obs[0])
+    def preprocess_observations(self,obs):
+        if(self.env_name == "invpend"):
+            return np.array([np.arcsin(obs[3]),obs[0]])
+        if(self.env_name == "mountaincar"):
+            return np.array([obs[0],obs[1]])
+        if(self.env_name == "cheetah"):
+            return np.dot(obs,self.w_in)
+        raise ValueError("This should not happen")
+
+    def preprocess_actions(self,action):
+        if(self.env_name == "cheetah"):
+            return np.dot(action,self.w_out)
+        else:
+            return action
 
     def run_one_episode(self,do_render=False):
         total_reward = 0
         obs = self.env.reset()
-        self.lif.Reset()
-        if(do_render):
-            rewardlog = open('rewardlog.log','w')
-            self.lif.DumpClear('lif-dump.csv')
-
-        observations = []
-        for i in range(0,2):
-            observations.append(float(0))
-
-        self.set_observations_for_lif(obs,observations)
-        actions = np.zeros(1)
-        self.lif.Update(observations,0.01,10)
+        self.nn.Reset()
 
         total_reward=np.zeros(1)
-        gamma = 1.0
-        time =0.0
-
-        start_pos=0
-        has_started=False
-        i=0
-
-        done2 = False
         while 1:
-            action = self.lif.Update(observations,0.01,10)
-            actions[0]=action[0]
-            if(do_render):
-                print('T/R: '+str(time)+', '+str(total_reward)+': '+str(obs[1])+', '+str(obs[4])+', '+str(np.arcsin(float(obs[3]))))
-            obs, r, done, info = self.env.step(actions)
-            self.set_observations_for_lif(obs,observations)
+            obs = self.preprocess_observations(obs)
+            action = self.nn.step(obs)
+            action = self.preprocess_actions(action)
 
-            if(not done2 and do_render):
-                done2 = np.abs(np.arcsin(float(obs[3]))) > 0.2
-            if(not done2):
+            obs, r, done, info = self.env.step(action)
+
+            if(self.env_name == "inv_pend"):
                 max_bonus = 200.0/1000.0
                 bonus = (1.0-abs(float(obs[0])))*max_bonus
                 if(r>0.0):
-                    total_reward+=bonus*gamma
+                    total_reward+=bonus
 
-                total_reward += r*gamma
-                #gamma = gamma*gamma
-            time += 0.0165
+            total_reward += r
 
-            if(do_render):
-                rewardlog.write(str(total_reward)+'\n')
-                rewardlog.flush()
-                self.lif.DumpState('lif-dump.csv')
-                self.env.render()
-                # screen = env.render(mode='rgb_array')
-                # print('Img shape: '+str(screen.shape))
-                # pic = TensorRGBToImage(screen)
-                # pic.save('vid/img_'+str(i).zfill(5)+'.png')
-                # phi = np.arcsin(obs[3])
-                # print('Obs: '+str(phi)+', '+str(obs[4])+' Act: '+str(actions[0]))
-
-                if(time >= 16.5):
-                    return
-            elif(done):
+            if(done):
                 break
-            i+=1
         # print('Return: '+str(total_reward))
-        return np.sum(total_reward)
+        return total_reward
 
     def evaluate_avg(self):
         N = 50
@@ -112,6 +80,11 @@ class NNsearchEnv:
 
         return np.mean(returns)
 
+    def input_size(self):
+        return int(self.env.observation_space.shape[0])
+
+    def output_size(self):
+        return int(self.env.action_space.shape[0])
 
     def run_multiple_episodes(self):
         returns = np.zeros(self.filter_len)
@@ -123,24 +96,8 @@ class NNsearchEnv:
 
         return [np.mean(worst_cases),np.mean(returns)]
 
-    def load_nn(self,filename):
-        self.lif = pybnn.LifNet(filename)
-        #lif.AddBiSensoryNeuron(1,6,-0.3,0.3)
-        # lif.AddBiSensoryNeuron(1,6,-0.03,0.03)
-        # lif.AddBiSensoryNeuron(7,0,-0.15,0.15)
 
-
-        # lif.AddBiSensoryNeuron(1,6,-0.03,0.03)
-        self.lif.AddBiSensoryNeuron(1,6,-0.12,0.12)
-        self.lif.AddBiSensoryNeuron(7,0,-1,1)
-
-        self.lif.AddBiMotorNeuron(9,10,-0.3,0.3)
-
-        self.lif.Reset()
-
-
-
-    def optimize(self,ts=datetime.timedelta(seconds=60),max_steps=1000000):
+    def optimize(self,max_steps):
         # Break symmetry by adding noise
         self.lif.AddNoise(0.5,15)
         self.lif.AddNoiseVleak(8,8)
@@ -288,41 +245,26 @@ class NNsearchEnv:
             self.csvlogfile.write(str(steps)+';'+str(avg_cost)+';'+str(performance_r)+';'+str(elapsed.total_seconds())+'\n')
             self.csvlogfile.flush()
 
-    def replay(self,filename):
-        self.load_tw(filename)
-        if not os.path.exists('vid'):
-            os.makedirs('vid')
-        print('Average Reward: '+str(self.evaluate_avg()))
-        print('Replay Return: '+str(self.run_multiple_episodes()))
+    def create_nn(self,nn_type):
+        input_dim = 2
+        output_dim = 1
+        if(self.env_name == "cheetah"):
+            output_dim = 2
+            self.w_in = np.random.normal(0,1,size=[self.input_size(),2])
+            self.w_out = np.random.normal(0,1,size=[2, self.output_size()])
 
-        self.run_one_episode(True)
-
-
-    def replay_arg(self):
-
-        worker_id =1
-        if(len(sys.argv)>1):
-            worker_id = int(sys.argv[1])
-
-        filename = 'bnn1/tw-optimized_'+str(worker_id)+'.bnn'
-        self.load_tw(filename)
-
-        print('Replay Return: '+str(self.run_multiple_episodes()))
-
-        self.run_one_episode(True)
-
-    def optimize_and_store(self,worker_id,in_file='tw_pure.bnn'):
-        self.load_tw(in_file)
-
-        if(worker_id.isdigit()):
-            seed = int(worker_id)+20*datetime.datetime.now().microsecond+23115
+        if(nn_type == "mlp"):
+            self.nn = mlp_module.MLP(input_dim,12,output_dim)
+        elif(nn_type == "lstm"):
+            self.nn = lstm_module.LSTM(input_dim,12,output_dim)
         else:
-            seed = 20*datetime.datetime.now().microsecond+23115
+            raise ValueError("This should not happen")
 
-        self.lif.SeedRandomNumberGenerator(seed)
+    def run_optimization(self,worker_id,max_steps):
+        seed = int(worker_id)+20*datetime.datetime.now().microsecond+23115
         rng.seed(seed)
 
-        root_path = 'results/filter_'+str(self.filter_len)+'_'+str(self.mean_len)
+        root_path = 'results/'+self.env_name+'_'+self.nn_type+'/filter_'+str(self.filter_len)+'_'+str(self.mean_len)
         log_path = root_path+'/logs_csv'
         log_path_txt = root_path+'/logs_txt'
         store_path = root_path+'/final'
@@ -349,26 +291,27 @@ class NNsearchEnv:
         self.lif.WriteToFile(outfile)
 
 
-def demo_run():
-    env = gym.make("RoboschoolInvertedPendulum-v1")
-    # print('Observation space: '+str(env.observation_space.shape[0]))
-    # print('Action space: '+str(env.action_space.shape[0]))
-
+if __name__=="__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--env',default="invpend")
+    parser.add_argument('--nn',default="mlp")
+    parser.add_argument('--steps',default=20000,type=int)
     parser.add_argument('--filter',default=10,type=int)
     parser.add_argument('--mean',default=5,type=int)
-    parser.add_argument('--file',default="tw_pure.bnn")
     parser.add_argument('--optimize',action="store_true")
     parser.add_argument('--id',default="0")
     args = parser.parse_args()
 
-    twenv = TWsearchEnv(env,args.filter,args.mean)
+    nnenv = NNsearchEnv(
+        env_name = args.env,
+        filter = args.filter,
+        mean = args.mean,
+        nn_type = args.nn
+    )
     if(args.optimize):
         print("Optimize")
-        twenv.optimize_and_store(str(args.id),args.file)
+        nnenv.run_optimization(args.id,args.steps)
     else:
         print("Replay")
-        twenv.replay(args.file)
+        nnenv.replay(args.file)
 
-if __name__=="__main__":
-    demo_run()
