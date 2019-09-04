@@ -28,16 +28,11 @@ class LSTM:
         self.block_size = block_size
         self.output_dimension = output_dimension
 
-        self.initialize_state()
+        self.reset_state()
         self.initialize_weights()
 
         self.input_activation_function = input_activation_function
         self.output_activation_function = output_activation_function
-
-    ''' Sets the internal state (c and y) to 1 '''
-    def initialize_state(self):
-        self.c = np.ones(self.block_size)
-        self.y = np.ones(self.block_size)
 
     ''' Sets the internal state (c and y) to 0 '''
     def reset_state(self):
@@ -47,18 +42,18 @@ class LSTM:
     ''' Initialize all kernel weights to 0.5 and all bias weights to 0 '''
     def initialize_weights(self):
         # Input weights
-        self.P_out = 0.5*np.ones([self.block_size,self.output_dimension])
+        self.P_out = np.zeros([self.block_size,self.output_dimension])
 
-        self.W_z = 0.5*np.ones([self.block_size,self.input_dimension])
-        self.W_i = 0.5*np.ones([self.block_size,self.input_dimension])
-        self.W_f = 0.5*np.ones([self.block_size,self.input_dimension])
-        self.W_o = 0.5*np.ones([self.block_size,self.input_dimension])
+        self.W_z = np.zeros([self.block_size,self.input_dimension])
+        self.W_i = np.zeros([self.block_size,self.input_dimension])
+        self.W_f = np.zeros([self.block_size,self.input_dimension])
+        self.W_o = np.zeros([self.block_size,self.input_dimension])
 
         # Recurrent weights
-        self.R_z = 0.5*np.ones([self.block_size,self.block_size])
-        self.R_i = 0.5*np.ones([self.block_size,self.block_size])
-        self.R_f = 0.5*np.ones([self.block_size,self.block_size])
-        self.R_o = 0.5*np.ones([self.block_size,self.block_size])
+        self.R_z = np.zeros([self.block_size,self.block_size])
+        self.R_i = np.zeros([self.block_size,self.block_size])
+        self.R_f = np.zeros([self.block_size,self.block_size])
+        self.R_o = np.zeros([self.block_size,self.block_size])
 
         # Bias weights
         self.b_z = np.zeros(self.block_size)
@@ -135,10 +130,10 @@ class LSTM:
         else:
             rnd = np.random.RandomState(seed)
 
-        self.P_backup = self.P_out
-        self.W_backup = [self.W_z,self.W_i,self.W_f,self.W_o]
-        self.R_backup = [self.R_z,self.R_i,self.R_f,self.R_o]
-        self.b_backup = [self.b_z,self.b_i,self.b_f,self.b_o]
+        self.P_backup = np.copy(self.P_out)
+        self.W_backup = [np.copy(self.W_z),np.copy(self.W_i),np.copy(self.W_f),np.copy(self.W_o)]
+        self.R_backup = [np.copy(self.R_z),np.copy(self.R_i),np.copy(self.R_f),np.copy(self.R_o)]
+        self.b_backup = [np.copy(self.b_z),np.copy(self.b_i),np.copy(self.b_f),np.copy(self.b_o)]
 
         self.P_out += rnd.normal(scale=scale,size=[self.block_size,self.output_dimension])
 

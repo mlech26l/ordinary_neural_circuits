@@ -1,8 +1,6 @@
 # from OpenGL import GLU
-from gym import wrappers
+import gym
 import numpy as np
-import random as rng
-from PIL import Image,ImageDraw
 import datetime
 import sys
 import os
@@ -12,23 +10,23 @@ import lstm_module
 
 env_table = {
     "invpend": "RoboschoolInvertedPendulum-v1",
-    "cheetah": "HalfCheetah-v1",
+    "cheetah": "HalfCheetah-v2",
     "mountaincar": "MountainCarContinuous-v0",
 }
 
 class NNsearchEnv:
-    def __init__(self,env_name,filter,mean,nn_type):
+    def __init__(self,env_name,filter_len,mean_len,nn_type):
         self.env_name = env_name
         assert env_name in env_table.keys(), "Envname must be one of "+str(env_table.keys())
         if(env_name == "invpend"):
-            import gym, roboschool
+            import roboschool
         
         self.env = gym.make(env_table[env_name])
         self.nn_type = nn_type
         self.create_nn(self.nn_type)
 
-        self.filter_len = filter
-        self.mean_len=mean
+        self.filter_len = filter_len
+        self.mean_len = mean_len
 
     def preprocess_observations(self,obs):
         if(self.env_name == "invpend"):
@@ -48,7 +46,7 @@ class NNsearchEnv:
     def run_one_episode(self,do_render=False):
         total_reward = 0
         obs = self.env.reset()
-        self.nn.Reset()
+        self.nn.reset_state()
 
         total_reward=np.zeros(1)
         while 1:
@@ -99,12 +97,7 @@ class NNsearchEnv:
 
     def optimize(self,max_steps):
         # Break symmetry by adding noise
-        self.lif.AddNoise(0.5,15)
-        self.lif.AddNoiseVleak(8,8)
-        self.lif.AddNoiseGleak(0.2,8)
-        self.lif.AddNoiseSigma(0.2,10)
-        self.lif.AddNoiseCm(0.1,10)
-        self.lif.CommitNoise()
+        self.nn.add_noise(0.01)
 
         r_values = np.zeros(1000000)
         r_counter=0
@@ -113,119 +106,32 @@ class NNsearchEnv:
         r_values[r_counter]=mean_ret
         r_counter+=1
 
-        num_distortions = 4
-        num_distortions_sigma=3
-        num_distortions_vleak=2
-        num_distortions_gleak=2
-        num_distortions_cm=2
-        steps_since_last_improvement=0
 
         starttime = datetime.datetime.now()
-        endtime = starttime + ts
         steps=-1
         log_freq=250
-        while endtime>datetime.datetime.now() and steps < max_steps:
+        while steps < max_steps:
             steps+=1
 
-            # weight
-            distortions = rng.randint(0,num_distortions)
-            variance = rng.uniform(0.01,0.4)
+            self.nn.add_noise(0.01)
+            if(self.env_name == "cheetah"):
+                self.w_backup = [self.w_in,self.w_out]
+                self.w_in += np.random.normal(0,1,size=[self.input_size(),2])
+                self.w_out += np.random.normal(0,1,size=[2, self.output_size()])
 
-            # sigma
-            distortions_sigma = rng.randint(0,num_distortions_sigma)
-            variance_sigma = rng.uniform(0.01,0.05)
-
-            # vleak
-            distortions_vleak = rng.randint(0,num_distortions_vleak)
-            variance_vleak = rng.uniform(0.1,3)
-
-            # vleak
-            distortions_gleak = rng.randint(0,num_distortions_gleak)
-            variance_gleak = rng.uniform(0.05,0.5)
-
-            #cm
-            distortions_cm = rng.randint(0,num_distortions_cm)
-            variance_cm = rng.uniform(0.01,0.1)
-
-            self.lif.AddNoise(variance,distortions)
-            self.lif.AddNoiseSigma(variance_sigma,distortions_sigma)
-            self.lif.AddNoiseVleak(variance_vleak,distortions_vleak)
-            self.lif.AddNoiseCm(variance_cm,distortions_cm)
-            self.lif.AddNoiseGleak(variance_gleak,distortions_gleak)
 
             (new_return,mean_ret) =  self.run_multiple_episodes()
             r_values[r_counter]=mean_ret
             r_counter+=1
-            # print('Stochastic Return: '+str(new_return))
+            print('Stochastic Return: '+str(new_return))
             if(new_return > current_return):
-                # print('Improvement! New Return: '+str(new_return))
-                if(self.logfile != None):
-                    elapsed = datetime.datetime.now()-starttime
-                    self.logfile.write('Improvement after: '+str(steps)+' steps, with return '+str(new_return)+', Elapsed: '+str(elapsed.total_seconds())+'\n')
-                    self.logfile.flush()
-
+                print('Improvement! New Return: '+str(new_return))
                 current_return=new_return
-                self.lif.CommitNoise()
-                steps_since_last_improvement=0
-
-                num_distortions-=1
-                if(num_distortions<4):
-                    num_distortions=4
-
-                num_distortions_sigma-=1
-                if(num_distortions_sigma<3):
-                    num_distortions_sigma=3
-
-                num_distortions_vleak-=1
-                if(num_distortions_vleak<2):
-                    num_distortions_vleak=2
-
-                num_distortions_gleak-=1
-                if(num_distortions_gleak<2):
-                    num_distortions_gleak=2
-
-                num_distortions_cm-=1
-                if(num_distortions_cm<2):
-                    num_distortions_cm=2
-                # print('Set Distortion to '+str(num_distortions))
             else:
-                steps_since_last_improvement+=1
-                self.lif.UndoNoise()
+                self.nn.undo_noise()
+                if(self.env_name == "cheetah"):
+                    self.w_in,self.w_out = self.w_backup
 
-                # no improvement seen for 100 steps
-                if(steps_since_last_improvement>50):
-                    steps_since_last_improvement=0
-
-                    # reevaluate return
-                    (current_return,mean_ret) =  self.run_multiple_episodes()
-                    r_values[r_counter]=mean_ret
-                    r_counter+=1
-                    # print('Reevaluate to: '+str(current_return))
-                    if(self.logfile != None):
-                        self.logfile.write('Reevaluate after: '+str(steps)+' steps, with return '+str(new_return)+'\n')
-                        self.logfile.flush()
-
-
-                    # Increase variance
-                    num_distortions+=1
-                    if(num_distortions>12):
-                        num_distortions=12
-                    # Increase variance sigma
-                    num_distortions_sigma+=1
-                    if(num_distortions_sigma>8):
-                        num_distortions_sigma=8
-                    # Increase variance vleak
-                    num_distortions_vleak+=1
-                    if(num_distortions_vleak>6):
-                        num_distortions_vleak=6
-                    # Increase variance vleak
-                    num_distortions_gleak+=1
-                    if(num_distortions_gleak>6):
-                        num_distortions_gleak=6
-                    # Increase variance cm
-                    num_distortions_cm+=1
-                    if(num_distortions_cm>4):
-                        num_distortions_cm=4
             if(steps % log_freq == 0 and self.csvlogfile != None):
                 elapsed = datetime.datetime.now()-starttime
                 avg_cost = self.evaluate_avg()
@@ -261,8 +167,6 @@ class NNsearchEnv:
             raise ValueError("This should not happen")
 
     def run_optimization(self,worker_id,max_steps):
-        seed = int(worker_id)+20*datetime.datetime.now().microsecond+23115
-        rng.seed(seed)
 
         root_path = 'results/'+self.env_name+'_'+self.nn_type+'/filter_'+str(self.filter_len)+'_'+str(self.mean_len)
         log_path = root_path+'/logs_csv'
@@ -283,12 +187,12 @@ class NNsearchEnv:
 
 
         print('Begin Return of '+worker_id+': '+str(self.run_multiple_episodes()))
-        self.optimize(ts=datetime.timedelta(hours=12),max_steps=50000)
+        self.optimize(max_steps)
         print('End Return: of '+worker_id+': '+str(self.run_multiple_episodes()))
 
-        outfile = store_path+'/tw-optimized_'+worker_id+ '.bnn'
+        # outfile = store_path+'/'+self.env_name+'_'+self.nn_type+'-optimized_'+worker_id+ '.npz'
 
-        self.lif.WriteToFile(outfile)
+        # self.lif.WriteToFile(outfile)
 
 
 if __name__=="__main__":
@@ -304,14 +208,14 @@ if __name__=="__main__":
 
     nnenv = NNsearchEnv(
         env_name = args.env,
-        filter = args.filter,
-        mean = args.mean,
+        filter_len = args.filter,
+        mean_len = args.mean,
         nn_type = args.nn
     )
-    if(args.optimize):
-        print("Optimize")
-        nnenv.run_optimization(args.id,args.steps)
-    else:
-        print("Replay")
-        nnenv.replay(args.file)
+    print("Optimize")
+    nnenv.run_optimization(args.id,args.steps)
+    # if(args.optimize):
+    # else:
+    #     print("Replay")
+    #     nnenv.replay(args.file)
 

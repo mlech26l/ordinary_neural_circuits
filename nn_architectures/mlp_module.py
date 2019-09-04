@@ -25,15 +25,15 @@ class MLP():
     ''' Initialize all kernel weights to 0.5 and all bias weights to 0 '''
     def initialize_weights(self):
         # Input weights
-        self.W_1 = 0.5*np.ones([self.hidden_size,self.input_dimension])
-        self.W_2 = 0.5*np.ones([self.output_dimension,self.hidden_size])
+        self.W_1 = np.zeros([self.hidden_size,self.input_dimension])
+        self.W_2 = np.zeros([self.output_dimension,self.hidden_size])
 
         self.b_1 = np.zeros([self.hidden_size])
         self.b_2 = np.zeros([self.output_dimension])
 
     def step(self,x):
-        x = np.tanh(np.dot(self.W_1,x)+self.b1)
-        x = np.dot(self.W_2,x)+self.b2
+        x = np.tanh(np.dot(self.W_1,x)+self.b_1)
+        x = np.dot(self.W_2,x)+self.b_2
         return x
         
     '''
@@ -49,8 +49,8 @@ class MLP():
         else:
             rnd = np.random.RandomState(seed)
 
-        self.W_backup = [self.W_1,self.W_2]
-        self.b_backup = [self.b_1,self.b_2]
+        self.W_backup = [np.copy(self.W_1),np.copy(self.W_2)]
+        self.b_backup = [np.copy(self.b_1),np.copy(self.b_2)]
 
         self.W_1 += rnd.normal(scale=scale,size=[self.hidden_size,self.input_dimension])
         self.W_2 += rnd.normal(scale=scale,size=[self.output_dimension,self.hidden_size])
