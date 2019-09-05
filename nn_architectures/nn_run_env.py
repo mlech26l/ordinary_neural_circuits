@@ -44,11 +44,15 @@ class NNsearchEnv:
             return action
 
     def run_one_episode(self,do_render=False):
+        # Uncomment to optimize a fake cost function for debugging
+        # self.nn.reset_state()
+        # c = self.nn.step(np.zeros(2))[0]
+        # return np.tanh(c)
+
         total_reward = 0
         obs = self.env.reset()
         self.nn.reset_state()
 
-        total_reward=np.zeros(1)
         while 1:
             obs = self.preprocess_observations(obs)
             action = self.nn.step(obs)
@@ -56,7 +60,7 @@ class NNsearchEnv:
 
             obs, r, done, info = self.env.step(action)
 
-            if(self.env_name == "inv_pend"):
+            if(self.env_name == "invpend"):
                 max_bonus = 200.0/1000.0
                 bonus = (1.0-abs(float(obs[0])))*max_bonus
                 if(r>0.0):
