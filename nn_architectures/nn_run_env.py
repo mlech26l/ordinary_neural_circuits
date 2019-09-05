@@ -110,31 +110,48 @@ class NNsearchEnv:
         r_values[r_counter]=mean_ret
         r_counter+=1
 
-
+        steps_since_last_improvement = 0
         starttime = datetime.datetime.now()
         steps=-1
         log_freq=250
+        amplitude = 0.01
         while steps < max_steps:
             steps+=1
-
-            self.nn.add_noise(0.01)
+            
+            self.nn.add_noise(amplitude)
             if(self.env_name == "cheetah"):
                 self.w_backup = [self.w_in,self.w_out]
-                self.w_in += np.random.normal(0,1,size=[self.input_size(),2])
-                self.w_out += np.random.normal(0,1,size=[2, self.output_size()])
+                self.w_in += np.random.normal(0,amplitude,size=[self.input_size(),2])
+                self.w_out += np.random.normal(0,amplitude,size=[2, self.output_size()])
 
 
             (new_return,mean_ret) =  self.run_multiple_episodes()
             r_values[r_counter]=mean_ret
             r_counter+=1
-            print('Stochastic Return: '+str(new_return))
+            # print('Stochastic Return: '+str(new_return))
             if(new_return > current_return):
-                print('Improvement! New Return: '+str(new_return))
+                # print('Improvement! New Return: '+str(new_return))
                 current_return=new_return
+                steps_since_last_improvement = 0
+                amplitude /= 2
+                if(amplitude < 0.01):
+                    amplitude = 0.01
             else:
                 self.nn.undo_noise()
                 if(self.env_name == "cheetah"):
                     self.w_in,self.w_out = self.w_backup
+                
+                steps_since_last_improvement+=1
+
+                # no improvement seen for 100 steps
+                if(steps_since_last_improvement>50):
+                    amplitude = amplitude*5
+                    if(amplitude > 1):
+                        amplitude = 1
+                    steps_since_last_improvement=0
+                    # reevaluate return
+                    (current_return,mean_ret) =  self.run_multiple_episodes()
+
 
             if(steps % log_freq == 0 and self.csvlogfile != None):
                 elapsed = datetime.datetime.now()-starttime
@@ -160,8 +177,8 @@ class NNsearchEnv:
         output_dim = 1
         if(self.env_name == "cheetah"):
             output_dim = 2
-            self.w_in = np.random.normal(0,1,size=[self.input_size(),2])
-            self.w_out = np.random.normal(0,1,size=[2, self.output_size()])
+            self.w_in = np.zeros([self.input_size(),2])
+            self.w_out = np.zeros([2, self.output_size()])
 
         if(nn_type == "mlp"):
             self.nn = mlp_module.MLP(input_dim,12,output_dim)
