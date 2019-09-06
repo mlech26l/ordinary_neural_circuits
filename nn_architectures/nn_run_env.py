@@ -44,7 +44,7 @@ class NNsearchEnv:
             return action
 
     def run_one_episode(self,do_render=False):
-        # Uncomment to optimize a fake cost function for debugging
+        ### Uncomment to optimize a fake cost function for debugging
         # self.nn.reset_state()
         # c = self.nn.step(np.zeros(2))[0]
         # return np.tanh(c)
@@ -120,7 +120,7 @@ class NNsearchEnv:
             
             self.nn.add_noise(amplitude)
             if(self.env_name == "cheetah"):
-                self.w_backup = [self.w_in,self.w_out]
+                self.w_backup = [np.copy(self.w_in),np.copy(self.w_out)]
                 self.w_in += np.random.normal(0,amplitude,size=[self.input_size(),2])
                 self.w_out += np.random.normal(0,amplitude,size=[2, self.output_size()])
 
