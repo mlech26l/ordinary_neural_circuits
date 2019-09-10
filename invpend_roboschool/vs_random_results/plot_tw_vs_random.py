@@ -15,5 +15,12 @@ for f in csv_files:
     result = arr[-1,1]
     lst.append(result)
 
-print("TW circuit: {:0.2f} +- {:0.2f}".format(np.mean(tw),np.std(tw)))
-print("Random    : {:0.2f} +- {:0.2f}".format(np.mean(random),np.std(random)))
+def count_success(lst):
+    succ = 0
+    for r in lst:
+        if(r > 900):
+            succ += 1
+    return 100*float(succ)/len(lst)
+
+print("TW circuit: {:0.2f} +- {:0.2f} ({:0.2f}% success rate)".format(np.mean(tw),np.std(tw),count_success(tw)))
+print("Random    : {:0.2f} +- {:0.2f} ({:0.2f}% success rate)".format(np.mean(random),np.std(random),count_success(random)))
