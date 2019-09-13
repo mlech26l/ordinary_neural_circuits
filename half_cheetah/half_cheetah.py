@@ -4,7 +4,7 @@ from gym import wrappers
 import numpy as np
 import pybnn
 import random as rng
-from PIL import Image,ImageDraw
+import cv2
 import datetime
 import sys
 import os
@@ -16,18 +16,6 @@ class TWsearchEnv:
         self.env = env
         self.filter_len = filter_len
         self.mean_len=mean_len
-
-    def TensorRGBToImage(self,tensor):
-        new_im = Image.new("RGB",(tensor.shape[1],tensor.shape[0]))
-        pixels=[]
-        for y in range(tensor.shape[0]):
-            for x in range(tensor.shape[1]):
-                r = tensor[y][x][0]
-                g = tensor[y][x][1]
-                b = tensor[y][x][2]
-                pixels.append((r,g,b))
-        new_im.putdata(pixels)
-        return new_im
 
     def input_size(self):
         return int(self.env.observation_space.shape[0])
@@ -95,16 +83,18 @@ class TWsearchEnv:
                 rewardlog.write(str(total_reward)+'\n')
                 rewardlog.flush()
                 self.lif.DumpState('lif-dump.csv')
-                self.env.render()
-                # screen = env.render(mode='rgb_array')
+                # self.env.render()
+                screen = self.env.render(mode='rgb_array')
+                cv2.imwrite(os.path.join("vid","frame_{:05d}.jpg".format(i)),cv2.cvtColor(screen, cv2.COLOR_RGB2BGR))
+                # Mean reward: 3690.0
                 # print('Img shape: '+str(screen.shape))
                 # pic = TensorRGBToImage(screen)
                 # pic.save('vid/img_'+str(i).zfill(5)+'.png')
                 # phi = np.arcsin(obs[3])
                 # print('Obs: '+str(phi)+', '+str(obs[4])+' Act: '+str(actions[0]))
 
-                if(time >= 16.5):
-                    return
+                # if(time >= 16.5):
+                #     return
             elif(done):
                 break
             i+=1
