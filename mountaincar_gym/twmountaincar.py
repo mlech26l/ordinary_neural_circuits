@@ -1,15 +1,14 @@
-from rllab.envs.box2d.cartpole_env import CartpoleEnv
-from rllab.envs.box2d.mountain_car_env import MountainCarEnv
-from rllab.envs.normalized_env import normalize
+from OpenGL import GLU
+import gym, roboschool
+from gym import wrappers
 import numpy as np
-from PIL import Image,ImageDraw
 import pybnn
 import random as rng
+from PIL import Image,ImageDraw
 import datetime
 import sys
 import os
-import matplotlib.pyplot as plt
-from time import sleep
+import argparse
 
 class TWsearchEnv:
     def __init__(self,env,filter_len, mean_len):
@@ -17,9 +16,17 @@ class TWsearchEnv:
         self.filter_len = filter_len
         self.mean_len=mean_len
 
-        # total_episodes = 50000
-        # self.episode_limit = total_episodes/self.filter_len
-        self.episode_limit=50000
+    def TensorRGBToImage(self,tensor):
+        new_im = Image.new("RGB",(tensor.shape[1],tensor.shape[0]))
+        pixels=[]
+        for y in range(tensor.shape[0]):
+            for x in range(tensor.shape[1]):
+                r = tensor[y][x][0]
+                g = tensor[y][x][1]
+                b = tensor[y][x][2]
+                pixels.append((r,g,b))
+        new_im.putdata(pixels)
+        return new_im
 
     def set_observations_for_lif(self,obs,observations):
         observations[0] = float(obs[0])
@@ -32,9 +39,6 @@ class TWsearchEnv:
         if(do_render):
             rewardlog = open('rewardlog.log','w')
             self.lif.DumpClear('lif-dump.csv')
-            N = 500
-            obs1 = np.zeros(N)
-            obs2 = np.zeros(N)
 
         observations = []
         for i in range(0,2):
@@ -50,58 +54,37 @@ class TWsearchEnv:
 
         start_pos=0
         has_started=False
-        i = 0
+        i=0
 
-        # maximum of 1000 steps
-        T = 500
-        for t in range(T):
+        done2 = False
+        while 1:
             action = self.lif.Update(observations,0.01,10)
-            actions=np.array(action)
-            if(do_render):
-                print('Step: '+str(t)+', t: '+str(time)+', total r '+str(total_reward)+': '+str(obs[0])+': '+str(obs[1]))
-                time += 1.0/24.0
-                obs1[i] = obs[0]
-                obs2[i] = obs[1]
+            actions[0]=action[0]
             obs, r, done, info = self.env.step(actions)
             self.set_observations_for_lif(obs,observations)
 
 
             total_reward += r*gamma
-            #gamma = gamma*gamma
+            time += 0.0165
 
             if(do_render):
                 rewardlog.write(str(total_reward)+'\n')
                 rewardlog.flush()
                 self.lif.DumpState('lif-dump.csv')
-                # pic = env.render()
-                screen = self.env.render()
-                sleep(0.016)
+                self.env.render()
+                print("R: {:0.3f}".format(float(total_reward)))
+                # screen = env.render(mode='rgb_array')
+                # print('Img shape: '+str(screen.shape))
                 # pic = TensorRGBToImage(screen)
                 # pic.save('vid/img_'+str(i).zfill(5)+'.png')
+                # phi = np.arcsin(obs[3])
+                # print('Obs: '+str(phi)+', '+str(obs[4])+' Act: '+str(actions[0]))
+
+                if(time >= 16.5):
+                    return
             elif(done):
                 break
             i+=1
-        if(do_render):
-            plt.clf()
-            plt.hist(obs1, 50, normed=1, facecolor='green', alpha=0.75)
-
-            plt.xlabel('Observation')
-            plt.ylabel('Probability')
-            plt.title('Observation[0]')
-            plt.grid(True)
-
-            plt.savefig('f10_5_obs1.png')
-
-            plt.clf()
-            plt.hist(obs2, 50, normed=1, facecolor='green', alpha=0.75)
-
-            plt.xlabel('Observation')
-            plt.ylabel('Probability')
-            plt.title('Observation[1]')
-            plt.grid(True)
-
-            plt.savefig('f10_5_obs2.png')
-
         # print('Return: '+str(total_reward))
         return np.sum(total_reward)
 
@@ -115,7 +98,6 @@ class TWsearchEnv:
         return np.mean(returns)
 
 
-
     def run_multiple_episodes(self):
         returns = np.zeros(self.filter_len)
         for i in range(0,self.filter_len):
@@ -126,22 +108,19 @@ class TWsearchEnv:
 
         return [np.mean(worst_cases),np.mean(returns)]
 
-
-
     def load_tw(self,filename):
         self.lif = pybnn.LifNet(filename)
-        #lif.AddBiSensoryNeuron(1,6,-0.3,0.3)
-        # self.lif.AddBiSensoryNeuron(1,6,-0.2,0.2)
-        # self.lif.AddBiSensoryNeuron(7,0,-0.5,0.5)
-
-        self.lif.AddBiSensoryNeuron(1,6,-0.8,0.8)
-        self.lif.AddBiSensoryNeuron(7,0,-1.5,1.5)
+        self.lif.AddBiSensoryNeuron(1,6,-0.3,0.3)
+        # self.lif.AddBiSensoryNeuron(1,6,-1.0,1.0)
+        self.lif.AddBiSensoryNeuron(7,0,-0.02,0.02)
 
         self.lif.AddBiMotorNeuron(9,10,-1,1)
 
         self.lif.Reset()
 
-    def optimize(self,ts=datetime.timedelta(seconds=60)):
+
+
+    def optimize(self,ts=datetime.timedelta(seconds=60),max_steps=1000000):
         # Break symmetry by adding noise
         self.lif.AddNoise(0.5,15)
         self.lif.AddNoiseVleak(8,8)
@@ -150,54 +129,47 @@ class TWsearchEnv:
         self.lif.AddNoiseCm(0.1,10)
         self.lif.CommitNoise()
 
-        r_values = np.zeros(self.episode_limit)
+
+        r_values = np.zeros(1000000)
         r_counter=0
 
         (current_return,mean_ret) =  self.run_multiple_episodes()
         r_values[r_counter]=mean_ret
         r_counter+=1
 
-        avg_cost = self.evaluate_avg()
-        self.csvlogfile.write(str(0)+';'+str(0)+';'+str(avg_cost)+';'+str(mean_ret)+';'+str(0)+'\n')
-        self.csvlogfile.flush()
-
-        num_distortions = 4
-        num_distortions_sigma=3
-        num_distortions_vleak=2
-        num_distortions_gleak=2
-        num_distortions_cm=2
+        num_distortions = 6
+        num_distortions_sigma=5
+        num_distortions_vleak=5
+        num_distortions_gleak=4
+        num_distortions_cm=4
         steps_since_last_improvement=0
 
         starttime = datetime.datetime.now()
         endtime = starttime + ts
         steps=-1
-        log_freq=1000
-        # while endtime>datetime.datetime.now():
-        while True:
+        log_freq=250
+        while endtime>datetime.datetime.now() and steps < max_steps:
             steps+=1
-
-            if(r_counter >= self.episode_limit):
-                break
 
             # weight
             distortions = rng.randint(0,num_distortions)
-            variance = rng.uniform(0.05,0.5)
+            variance = rng.uniform(0.01,0.8)
 
             # sigma
             distortions_sigma = rng.randint(0,num_distortions_sigma)
-            variance_sigma = rng.uniform(0.01,0.05)
+            variance_sigma = rng.uniform(0.01,0.08)
 
             # vleak
             distortions_vleak = rng.randint(0,num_distortions_vleak)
-            variance_vleak = rng.uniform(0.5,5)
+            variance_vleak = rng.uniform(0.1,3)
 
             # vleak
             distortions_gleak = rng.randint(0,num_distortions_gleak)
-            variance_gleak = rng.uniform(0.05,0.5)
+            variance_gleak = rng.uniform(0.05,0.8)
 
             #cm
             distortions_cm = rng.randint(0,num_distortions_cm)
-            variance_cm = rng.uniform(0.01,0.1)
+            variance_cm = rng.uniform(0.01,0.3)
 
             self.lif.AddNoise(variance,distortions)
             self.lif.AddNoiseSigma(variance_sigma,distortions_sigma)
@@ -208,10 +180,9 @@ class TWsearchEnv:
             (new_return,mean_ret) =  self.run_multiple_episodes()
             r_values[r_counter]=mean_ret
             r_counter+=1
-
             # print('Stochastic Return: '+str(new_return))
             if(new_return > current_return):
-                # print('Improvement! New Return: '+str(new_return))
+                print('Improvement! New Return: '+str(new_return))
                 if(self.logfile != None):
                     elapsed = datetime.datetime.now()-starttime
                     self.logfile.write('Improvement after: '+str(steps)+' steps, with return '+str(new_return)+', Elapsed: '+str(elapsed.total_seconds())+'\n')
@@ -222,40 +193,37 @@ class TWsearchEnv:
                 steps_since_last_improvement=0
 
                 num_distortions-=1
-                if(num_distortions<5):
-                    num_distortions=5
+                if(num_distortions<6):
+                    num_distortions=6
 
                 num_distortions_sigma-=1
-                if(num_distortions_sigma<4):
-                    num_distortions_sigma=4
+                if(num_distortions_sigma<5):
+                    num_distortions_sigma=5
 
                 num_distortions_vleak-=1
                 if(num_distortions_vleak<4):
                     num_distortions_vleak=4
 
                 num_distortions_gleak-=1
-                if(num_distortions_gleak<2):
-                    num_distortions_gleak=2
+                if(num_distortions_gleak<4):
+                    num_distortions_gleak=4
 
                 num_distortions_cm-=1
-                if(num_distortions_cm<2):
-                    num_distortions_cm=2
+                if(num_distortions_cm<4):
+                    num_distortions_cm=4
                 # print('Set Distortion to '+str(num_distortions))
             else:
                 steps_since_last_improvement+=1
                 self.lif.UndoNoise()
 
                 # no improvement seen for 100 steps
-                if(steps_since_last_improvement>50 and r_counter % log_freq != 0):
+                if(steps_since_last_improvement>50):
                     steps_since_last_improvement=0
 
                     # reevaluate return
-                    if(r_counter >= self.episode_limit):
-                        break
                     (current_return,mean_ret) =  self.run_multiple_episodes()
                     r_values[r_counter]=mean_ret
                     r_counter+=1
-
                     # print('Reevaluate to: '+str(current_return))
                     if(self.logfile != None):
                         self.logfile.write('Reevaluate after: '+str(steps)+' steps, with return '+str(new_return)+'\n')
@@ -264,70 +232,83 @@ class TWsearchEnv:
 
                     # Increase variance
                     num_distortions+=1
-                    if(num_distortions>12):
+                    if(num_distortions>16):
                         num_distortions=12
                     # Increase variance sigma
                     num_distortions_sigma+=1
-                    if(num_distortions_sigma>8):
-                        num_distortions_sigma=8
+                    if(num_distortions_sigma>12):
+                        num_distortions_sigma=12
                     # Increase variance vleak
                     num_distortions_vleak+=1
                     if(num_distortions_vleak>8):
                         num_distortions_vleak=8
                     # Increase variance vleak
                     num_distortions_gleak+=1
-                    if(num_distortions_gleak>6):
-                        num_distortions_gleak=6
+                    if(num_distortions_gleak>8):
+                        num_distortions_gleak=8
                     # Increase variance cm
                     num_distortions_cm+=1
-                    if(num_distortions_cm>4):
-                        num_distortions_cm=4
-            if(r_counter % log_freq == 0 and self.csvlogfile != None):
+                    if(num_distortions_cm>7):
+                        num_distortions_cm=7
+                if(steps_since_last_improvement > 300):
+                    self.lif.AddNoise(0.5,15)
+                    self.lif.AddNoiseVleak(8,8)
+                    self.lif.AddNoiseGleak(0.2,8)
+                    self.lif.AddNoiseSigma(0.2,10)
+                    self.lif.AddNoiseCm(0.1,10)
+                    self.lif.CommitNoise()
+                    
+            if(steps % log_freq == 0 and self.csvlogfile != None):
                 elapsed = datetime.datetime.now()-starttime
                 avg_cost = self.evaluate_avg()
                 performance_r = np.mean(r_values[0:r_counter])
-                self.csvlogfile.write(str(steps)+';'+str(r_counter)+';'+str(avg_cost)+';'+str(performance_r)+';'+str(elapsed.total_seconds())+'\n')
+                self.csvlogfile.write(str(steps)+';'+str(avg_cost)+';'+str(performance_r)+';'+str(elapsed.total_seconds())+'\n')
                 self.csvlogfile.flush()
                 # outfile = logdir+'/tw-'+str(worker_id)+'_steps-'+str(steps)+'.bnn'
                 # lif.WriteToFile(outfile)
                     # print('Set Distortion to '+str(num_distortions))
+        if(self.logfile != None):
+            self.logfile.write('Total steps done: '+str(steps)+'\n')
+            self.logfile.close()
         if(self.csvlogfile != None):
             elapsed = datetime.datetime.now()-starttime
             avg_cost = self.evaluate_avg()
             performance_r = np.mean(r_values[0:r_counter])
-            self.csvlogfile.write(str(steps)+';'+str(r_counter)+';'+str(avg_cost)+';'+str(performance_r)+';'+str(elapsed.total_seconds())+'\n')
+            self.csvlogfile.write(str(steps)+';'+str(avg_cost)+';'+str(performance_r)+';'+str(elapsed.total_seconds())+'\n')
             self.csvlogfile.flush()
-
-        if(self.logfile != None):
-            self.logfile.write('Total steps done: '+str(steps)+'\n')
-            self.logfile.close()
 
     def replay(self,filename):
         self.load_tw(filename)
         if not os.path.exists('vid'):
             os.makedirs('vid')
-
-        # starttime = datetime.datetime.now()
         print('Average Reward: '+str(self.evaluate_avg()))
-        # elapsed = datetime.datetime.now()-starttime
-        # print('Performance: ', str(500.0/elapsed.total_seconds()),' episodes per second')
-        # sys.exit()
-
         print('Replay Return: '+str(self.run_multiple_episodes()))
 
         self.run_one_episode(True)
 
 
-    def optimize_and_store(self):
-
-        self.load_tw('tw_pure.bnn')
+    def replay_arg(self):
 
         worker_id =1
         if(len(sys.argv)>1):
             worker_id = int(sys.argv[1])
 
-        seed = worker_id+20*datetime.datetime.now().microsecond+23115
-        self.lif.SeedRandomNumberGenerator(seed);
+        filename = 'bnn1/tw-optimized_'+str(worker_id)+'.bnn'
+        self.load_tw(filename)
+
+        print('Replay Return: '+str(self.run_multiple_episodes()))
+
+        self.run_one_episode(True)
+
+    def optimize_and_store(self,worker_id,in_file='tw_pure.bnn'):
+        self.load_tw(in_file)
+
+        if(worker_id.isdigit()):
+            seed = int(worker_id)+20*datetime.datetime.now().microsecond+23115
+        else:
+            seed = 20*datetime.datetime.now().microsecond+23115
+
+        self.lif.SeedRandomNumberGenerator(seed)
         rng.seed(seed)
 
         root_path = 'results/filter_'+str(self.filter_len)+'_'+str(self.mean_len)
@@ -342,34 +323,41 @@ class TWsearchEnv:
         if not os.path.exists(store_path):
             os.makedirs(store_path)
 
-        log_file=log_path_txt+'/textlog_'+str(worker_id)+'.log'
-        csv_log=log_path+'/csvlog_'+str(worker_id)+'.log'
+        log_file=log_path_txt+'/textlog_'+worker_id+'.log'
+        csv_log=log_path+'/csvlog_'+worker_id+'.log'
         self.logfile = open(log_file, 'w')
         self.csvlogfile = open(csv_log, 'w')
 
 
-        print('Begin Return of '+str(worker_id)+': '+str(self.run_multiple_episodes()))
-        self.optimize(ts=datetime.timedelta(hours=16))
-        print('End Return: of '+str(worker_id)+': '+str(self.run_multiple_episodes()))
+        print('Begin Return of '+worker_id+': '+str(self.run_multiple_episodes()))
+        self.optimize(ts=datetime.timedelta(hours=12),max_steps=50000)
+        print('End Return: of '+worker_id+': '+str(self.run_multiple_episodes()))
 
-        outfile = store_path+'/tw-optimized_'+str(worker_id)+ '.bnn';
+        outfile = store_path+'/tw-optimized_'+worker_id+ '.bnn'
 
         self.lif.WriteToFile(outfile)
 
 
+def demo_run():
+    env = gym.make("MountainCarContinuous-v0")
+    # print('Observation space: '+str(env.observation_space.shape[0]))
+    # print('Action space: '+str(env.action_space.shape[0]))
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--filter',default=20,type=int)
+    parser.add_argument('--mean',default=20,type=int)
+    parser.add_argument('--file',default="tw_pure.bnn")
+    parser.add_argument('--optimize',action="store_true")
+    parser.add_argument('--id',default="0")
+    args = parser.parse_args()
+
+    twenv = TWsearchEnv(env,args.filter,args.mean)
+    if(args.optimize):
+        print("Optimize")
+        twenv.optimize_and_store(str(args.id),args.file)
+    else:
+        print("Replay")
+        twenv.replay(args.file)
 
 if __name__=="__main__":
-    env = normalize(MountainCarEnv())
-
-    fitler_len = 10
-    mean_len = 5
-    if(len(sys.argv)>2):
-        fitler_len = int(sys.argv[2])
-        mean_len = int(sys.argv[2])
-    if(len(sys.argv)>3):
-        mean_len = int(sys.argv[3])
-
-    twenv = TWsearchEnv(env,fitler_len,mean_len)
-    twenv.replay('final/tw-optimized.bnn')
-    #twenv.optimize_and_store()
-
+    demo_run()
