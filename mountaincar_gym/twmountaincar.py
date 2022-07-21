@@ -1,5 +1,4 @@
-from OpenGL import GLU
-import gym, roboschool
+import gym
 from gym import wrappers
 import numpy as np
 import pybnn
@@ -330,7 +329,7 @@ class TWsearchEnv:
 
 
         print('Begin Return of '+worker_id+': '+str(self.run_multiple_episodes()))
-        self.optimize(ts=datetime.timedelta(hours=12),max_steps=50000)
+        self.optimize(ts=datetime.timedelta(minutes=3),max_steps=50000)
         print('End Return: of '+worker_id+': '+str(self.run_multiple_episodes()))
 
         outfile = store_path+'/tw-optimized_'+worker_id+ '.bnn'

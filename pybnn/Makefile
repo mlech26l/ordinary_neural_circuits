@@ -32,7 +32,7 @@ all: $(BINDIR)/$(TARGET_LIB)
 
 
 $(BINDIR)/$(TARGET_LIB): $(OBJECTS)
-	g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython3.8 -L/usr/lib/x86_64-linux-gnu/libboost_python38.so.1.71.0
+	g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython3.8 -lboost_python38 -L/usr/lib/x86_64-linux-gnu/
 	# g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython3.6m -lboost_python-py36
 	# g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython3.5m -lboost_python-py35
 	# g++ -shared $(LFLAGS) -Wl,-soname,$(TARGET_LIB) -o bin/$(TARGET_LIB) $(OBJECTS) -lpython2.7 -lboost_python-py27
